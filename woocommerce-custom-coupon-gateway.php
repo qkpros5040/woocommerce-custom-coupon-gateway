@@ -78,7 +78,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     return;
                 }
 
-                wp_enqueue_script( 'custom-coupon-gateway', plugin_dir_url( __FILE__ ) . 'js/custom-coupon-gateway.js', array( 'jquery' ), '1.0.0', true );
+                wp_enqueue_script( 'custom-coupon-gateway', plugin_dir_url( __FILE__ ) . 'custom-coupon-gateway.js', array( 'jquery' ), '1.0.0', true );
 
                 wp_localize_script( 'custom-coupon-gateway', 'customCouponGateway', array(
                     'ajax_url' => admin_url( 'admin-ajax.php' ),
