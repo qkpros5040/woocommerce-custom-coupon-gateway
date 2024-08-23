@@ -59,30 +59,46 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 );
             }
 
-            public function payment_fields() {
-                ?>
-                <p><?php echo esc_html( $this->description ); ?></p>
-                <fieldset>
-                    <p class="form-row form-row-wide">
-                        <label for="custom_coupon_code"><?php _e( 'Coupon Code', 'woocommerce' ); ?> <span class="required">*</span></label>
-                        <input type="text" class="input-text" id="custom_coupon_code" name="custom_coupon_code" placeholder="<?php _e( 'Enter your coupon code', 'woocommerce' ); ?>" />
-                        <button type="button" id="validate_coupon_code" class="button"><?php _e( 'Validate Coupon', 'woocommerce' ); ?></button>
-                        <span id="coupon_validation_message"></span>
-                    </p>
-                </fieldset>
-                <?php
-            }
+           public function payment_fields() {
+				?>
+				<p><?php echo esc_html( $this->description ); ?></p>
+				<fieldset style="padding: 5px 0;">
+
+					<!-- Coupon Code Section -->
+					<label for="custom_coupon_code"><?php _e( 'Coupon Code', 'woocommerce' ); ?> <span class="required">*</span></label>
+					<div style="display: flex; align-items: center;">
+						<p class="form-row form-row-wide" style="margin: 0; width: 75%">
+							<input type="text" class="input-text" id="custom_coupon_code" name="custom_coupon_code" placeholder="<?php _e( 'Enter your coupon code', 'woocommerce' ); ?>" />
+						</p>
+						<button type="button" id="validate_coupon_code" class="button" style="width: 25%;padding: 9px 0;"><?php _e( 'Validate Coupon', 'woocommerce' ); ?></button>
+					</div>
+					<span id="coupon_validation_message"></span>
+
+					<!-- Approuvé par le directeur Section -->
+					<div style="margin-top: 20px;">
+						<label for="approved_by_director"><?php _e( 'Approved by Director (name)', 'woocommerce' ); ?> <span class="required">*</span></label>
+						<p class="form-row form-row-wide" style="margin: 0;">
+							<input type="text" class="input-text" id="approved_by_director" name="approved_by_director" placeholder="<?php _e( 'Enter director\'s name', 'woocommerce' ); ?>" required />
+						</p>
+					</div>
+
+				</fieldset>
+				<?php
+			}
 
             public function payment_scripts() {
                 if ( ! is_checkout() ) {
                     return;
                 }
 
-                wp_enqueue_script( 'custom-coupon-gateway', plugin_dir_url( __FILE__ ) . 'custom-coupon-gateway.js', array( 'jquery' ), '1.0.0', true );
+                wp_enqueue_script( 'custom-coupon-gateway', plugin_dir_url( __FILE__ ) . 'custom-coupon-gateway.js', array( 'jquery' ), '1.0.0'.rand(), true );
 
                 wp_localize_script( 'custom-coupon-gateway', 'customCouponGateway', array(
                     'ajax_url' => admin_url( 'admin-ajax.php' ),
                     'nonce'    => wp_create_nonce( 'custom_coupon_nonce' ),
+					'textDomain' => array(
+						'enterCoupon' => __( 'Please enter a coupon code.', 'woocommerce' ),
+					)
                 ));
             }
 
@@ -175,4 +191,23 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
     add_action( 'wp_ajax_validate_coupon_code', 'validate_coupon_code_ajax' );
     add_action( 'wp_ajax_nopriv_validate_coupon_code', 'validate_coupon_code_ajax' );
+	
+	
+	// Validate the custom checkout field (Approuvé par le directeur)
+		add_action('woocommerce_checkout_process', 'validate_director_approval_field');
+
+		function validate_director_approval_field() {
+			if (empty($_POST['approved_by_director'])) {
+				wc_add_notice(__('Please enter the name of the director who approved this.', 'woocommerce'), 'error');
+			}
+		}
+	
+			// Save the custom field (Approuvé par le directeur) to order meta
+		add_action('woocommerce_checkout_update_order_meta', 'save_director_approval_field');
+
+		function save_director_approval_field($order_id) {
+			if (!empty($_POST['approved_by_director'])) {
+				update_post_meta($order_id, '_approved_by_director', sanitize_text_field($_POST['approved_by_director']));
+			}
+		}
 }
