@@ -138,6 +138,11 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 $coupon = new WC_Coupon( $coupon_code );
                 $coupon->set_usage_count( $coupon->get_usage_count() + 1 );
                 $coupon->save();
+				// Add coupon code to order meta
+				update_post_meta( $order_id, '_custom_coupon_code', $coupon_code );
+
+				// Add a note to the order with the coupon code
+				$order->add_order_note( sprintf( __( 'Order paid using coupon code: %s', 'woocommerce' ), $coupon_code ) );
 
                 // Empty the cart.
                 WC()->cart->empty_cart();
