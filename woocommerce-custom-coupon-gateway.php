@@ -65,10 +65,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				<fieldset style="padding: 5px 0;">
 
 					<!-- Coupon Code Section -->
-					<label for="custom_coupon_code"><?php _e( 'Coupon Code', 'woocommerce' ); ?> <span class="required">*</span></label>
+					<label for="custom_coupon_code"><?php _e( 'Budget card code', 'woocommerce' ); ?> <span class="required">*</span></label>
 					<div style="display: flex; align-items: center;">
 						<p class="form-row form-row-wide" style="margin: 0; width: 75%">
-							<input type="text" class="input-text" id="custom_coupon_code" name="custom_coupon_code" placeholder="<?php _e( 'Enter your coupon code', 'woocommerce' ); ?>" />
+							<input type="text" class="input-text" id="custom_coupon_code" name="custom_coupon_code" placeholder="<?php _e( 'Enter your Budget card code', 'woocommerce' ); ?>" />
 						</p>
 						<button type="button" id="validate_coupon_code" class="button" style="width: 25%;padding: 9px 0;"><?php _e( 'Validate Coupon', 'woocommerce' ); ?></button>
 					</div>
@@ -127,35 +127,79 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 return true;
             }
 
-            public function process_payment( $order_id ) {
-                $order = wc_get_order( $order_id );
+//             public function process_payment( $order_id ) {
+//                 $order = wc_get_order( $order_id );
 
-                // Mark as paid.
-                $order->payment_complete();
+//                 // Mark as paid.
+//                 $order->payment_complete();
 
-                // Reduce coupon usage count.
-                $coupon_code = wc_clean( $_POST['custom_coupon_code'] );
-                $coupon = new WC_Coupon( $coupon_code );
-                $coupon->set_usage_count( $coupon->get_usage_count() + 1 );
-                $coupon->save();
-				// Add coupon code to order meta
-				update_post_meta( $order_id, '_custom_coupon_code', $coupon_code );
+//                 // Reduce coupon usage count.
+//                 $coupon_code = wc_clean( $_POST['custom_coupon_code'] );
+//                 $coupon = new WC_Coupon( $coupon_code );
+//                 $coupon->set_usage_count( $coupon->get_usage_count() + 1 );
+//                 $coupon->save();
+// 				// Add coupon code to order meta
+// 				update_post_meta( $order_id, '_custom_coupon_code', $coupon_code );
 
-				// Add a note to the order with the coupon code
-				$order->add_order_note( sprintf( __( 'Order paid using coupon code: %s', 'woocommerce' ), $coupon_code ) );
+// 				// Add a note to the order with the coupon code
+// 				$order->add_order_note( sprintf( __( 'Order paid using coupon code: %s', 'woocommerce' ), $coupon_code ) );
 
-                // Empty the cart.
-                WC()->cart->empty_cart();
+//                 // Empty the cart.
+//                 WC()->cart->empty_cart();
 
-                // Return thankyou redirect.
-                return array(
-                    'result'   => 'success',
-                    'redirect' => $this->get_return_url( $order ),
-                );
-            }
-        }
-    }
+//                 // Return thankyou redirect.
+//                 return array(
+//                     'result'   => 'success',
+//                     'redirect' => $this->get_return_url( $order ),
+//                 );
+//             }
+//         }
+//     }
 
+		public function process_payment( $order_id ) {
+			$order = wc_get_order( $order_id );
+
+			// Get the coupon code from the order
+			$coupon_code = wc_clean( $_POST['custom_coupon_code'] );
+			$coupon = new WC_Coupon( $coupon_code );
+
+			// Get the current discount amount of the coupon
+			$discount = $coupon->get_amount();
+			$cart_total = WC()->cart->get_total( 'edit' );
+
+			// Subtract the cart total from the coupon amount
+			$new_discount = $discount - $cart_total;
+
+			if ( $new_discount > 0 ) {
+				// Update the coupon with the new amount
+				update_post_meta( $coupon->get_id(), 'coupon_amount', $new_discount );
+			} else {
+				// If the new discount is zero or less, delete the coupon or set it to zero
+				update_post_meta( $coupon->get_id(), 'coupon_amount', 0 );
+			}
+
+			// Mark as paid if the coupon covers the full amount
+			$order->payment_complete();
+
+			// Reduce coupon usage count
+			$coupon->set_usage_count( $coupon->get_usage_count() + 1 );
+			$coupon->save();
+
+			// Add coupon code to order meta
+			update_post_meta( $order_id, '_custom_coupon_code', $coupon_code );
+
+			// Add a note to the order with the coupon code
+			$order->add_order_note( sprintf( __( 'Order paid using coupon code: %s. Remaining coupon amount: %s', 'woocommerce' ), $coupon_code, wc_price($new_discount) ) );
+
+			// Empty the cart
+			WC()->cart->empty_cart();
+
+			// Return thank you redirect
+			return array(
+				'result'   => 'success',
+				'redirect' => $this->get_return_url( $order ),
+			);
+			}
     add_filter( 'woocommerce_payment_gateways', 'add_custom_coupon_payment_gateway' );
 
     function add_custom_coupon_payment_gateway( $gateways ) {
@@ -213,6 +257,56 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 		function save_director_approval_field($order_id) {
 			if (!empty($_POST['approved_by_director'])) {
 				update_post_meta($order_id, '_approved_by_director', sanitize_text_field($_POST['approved_by_director']));
+			}
+		}
+	
+		// Display the coupon code on the thank you page
+		add_action( 'woocommerce_thankyou', 'display_coupon_code_on_thankyou_page', 20 );
+
+		function display_coupon_code_on_thankyou_page( $order_id ) {
+			$order = wc_get_order( $order_id );
+			$coupon_code = get_post_meta( $order_id, '_custom_coupon_code', true );
+
+			if ( ! empty( $coupon_code ) ) {
+				echo '<p><strong>' . __( 'Coupon Code Used:', 'woocommerce' ) . '</strong> ' . esc_html( $coupon_code ) . '</p>';
+			}
+		}
+
+				// Add coupon // Add coupon code and "Approved by Director" to the "Détails de la commande" section on the thank you page and emails
+		add_action( 'woocommerce_order_item_meta_end', 'add_meta_to_order_details', 10, 4 );
+
+		function add_meta_to_order_details( $item_id, $item, $order, $plain_text ) {
+			// Get the coupon code and "Approved by Director" from order meta
+			$coupon_code = get_post_meta( $order->get_id(), '_custom_coupon_code', true );
+			$approved_by_director = get_post_meta( $order->get_id(), '_approved_by_director', true );
+
+			// Check if there is a coupon code to display
+			if ( ! empty( $coupon_code ) ) {
+				echo '<p><strong>' . __( 'Coupon Code:', 'woocommerce' ) . '</strong> ' . esc_html( $coupon_code ) . '</p>';
+			}
+
+			// Check if there is a director approval to display
+			if ( ! empty( $approved_by_director ) ) {
+				echo '<p><strong>' . __( 'Approved by Director:', 'woocommerce' ) . '</strong> ' . esc_html( $approved_by_director ) . '</p>';
+			}
+		}
+
+		// Add coupon code and "Approved by Director" to the order edit page in the WooCommerce admin
+		add_action( 'woocommerce_admin_order_data_after_order_details', 'display_meta_in_admin_order_meta', 10, 1 );
+
+		function display_meta_in_admin_order_meta( $order ) {
+			// Get the coupon code and "Approved by Director" from order meta
+			$coupon_code = get_post_meta( $order->get_id(), '_custom_coupon_code', true );
+			$approved_by_director = get_post_meta( $order->get_id(), '_approved_by_director', true );
+
+			// Check if there is a coupon code to display
+			if ( ! empty( $coupon_code ) ) {
+				echo '<p class="form-field form-field-wide wc-customer-user"><strong>' . __( 'Coupon Code Used:', 'woocommerce' ) . '</strong> ' . esc_html( $coupon_code ) . '</p>';
+			}
+
+			// Check if there is a director approval to display
+			if ( ! empty( $approved_by_director ) ) {
+				echo '<p class="form-field form-field-wide wc-customer-user"><strong>' . __( 'Approved by Director:', 'woocommerce' ) . '</strong> ' . esc_html( $approved_by_director ) . '</p>';
 			}
 		}
 }
