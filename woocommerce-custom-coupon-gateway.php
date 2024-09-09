@@ -103,6 +103,13 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
             }
 
             public function validate_fields() {
+				
+				 // Check if the selected payment method is 'custom_coupon_gateway'
+				if ( 'custom_coupon_gateway' !== WC()->session->get('chosen_payment_method') ) {
+					return; // Exit if it's not the custom payment method.
+				}
+				
+				
                 if ( empty( $_POST['custom_coupon_code'] ) ) {
                     wc_add_notice( __( 'Please enter a coupon code.', 'woocommerce' ), 'error' );
                     return false;
@@ -157,6 +164,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 //     }
 
 		public function process_payment( $order_id ) {
+			// Check if the selected payment method is 'custom_coupon_gateway'
+			if ( 'custom_coupon_gateway' !== WC()->session->get('chosen_payment_method') ) {
+				return; // Exit if it's not the custom payment method.
+			}
 			$order = wc_get_order( $order_id );
 
 			// Get the coupon code from the order
@@ -199,7 +210,12 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				'result'   => 'success',
 				'redirect' => $this->get_return_url( $order ),
 			);
-			}
+		}
+			
+	}	
+}
+			
+			
     add_filter( 'woocommerce_payment_gateways', 'add_custom_coupon_payment_gateway' );
 
     function add_custom_coupon_payment_gateway( $gateways ) {
@@ -246,6 +262,12 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 		add_action('woocommerce_checkout_process', 'validate_director_approval_field');
 
 		function validate_director_approval_field() {
+			
+			// Check if the selected payment method is 'custom_coupon_gateway'
+			if ( 'custom_coupon_gateway' !== WC()->session->get('chosen_payment_method') ) {
+				return; // Exit if it's not the custom payment method.
+			}
+			
 			if (empty($_POST['approved_by_director'])) {
 				wc_add_notice(__('Please enter the name of the director who approved this.', 'woocommerce'), 'error');
 			}
@@ -310,3 +332,4 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			}
 		}
 }
+
